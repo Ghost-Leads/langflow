@@ -126,6 +126,7 @@ dependencies = [
     "openai>=1.68.2",
     'gassist>=0.0.1; sys_platform == "win32"',
     "twelvelabs>=0.4.7",
+    "asyncpg>=0.29.0"
 ]
 
 [dependency-groups]
