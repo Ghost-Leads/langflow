@@ -4,8 +4,8 @@ services:
     name: langflow
     runtime: docker
     dockerfilePath: ./docker/render.Dockerfile
-    repo: https://github.com/langflow-ai/langflow
-    branch: main
+    repo: https://github.com/Ghost-Leads/langflow
+    branch: develop
     plan: standard
     healthCheckPath: /health_check
     autoDeploy: false
