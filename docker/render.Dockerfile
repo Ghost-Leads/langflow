@@ -30,5 +30,5 @@ WORKDIR /app
 # Expose LangFlow's default port
 EXPOSE 7860
 
-# Start LangFlow
-ENTRYPOINT ["python", "-m", "langflow", "run"]
+# Start LangFlow with explicit host and port binding
+ENTRYPOINT ["python", "-m", "langflow", "run", "--host", "0.0.0.0", "--port", "7860"]
