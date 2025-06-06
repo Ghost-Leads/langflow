@@ -18,7 +18,7 @@ COPY . .
 
 # Install uv and backend dependencies
 RUN pip install uv
-RUN uv pip install -e ".[postgresql]"
+RUN uv pip install --system -e ".[postgresql]"
 
 # Build frontend (builds into src/frontend/build)
 WORKDIR /app/src/frontend
