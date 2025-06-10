@@ -16,7 +16,7 @@ from pydantic import (
     field_serializer,
     field_validator,
 )
-from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import Enum as SQLEnum, DateTime
 from sqlalchemy import Text, UniqueConstraint, text
 from sqlmodel import JSON, Column, Field, Relationship, SQLModel
 
@@ -45,7 +45,7 @@ class FlowBase(SQLModel):
     gradient: str | None = Field(default=None, nullable=True)
     data: dict | None = Field(default=None, nullable=True)
     is_component: bool | None = Field(default=False, nullable=True)
-    updated_at: datetime | None = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=True)
+    updated_at: datetime | None = Field(default_factory=lambda: datetime.now(timezone.utc), sa_column=Column(DateTime(timezone=True), nullable=True))
     webhook: bool | None = Field(default=False, nullable=True, description="Can be used on the webhook endpoint")
     endpoint_name: str | None = Field(default=None, nullable=True, index=True)
     tags: list[str] | None = None
