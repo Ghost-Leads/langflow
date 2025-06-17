@@ -3,13 +3,14 @@ from uuid import UUID, uuid4
 
 from pydantic import field_serializer, field_validator
 from sqlmodel import JSON, Column, Field, SQLModel
+from sqlalchemy import DateTime
 
 from langflow.serialization.constants import MAX_ITEMS_LENGTH, MAX_TEXT_LENGTH
 from langflow.serialization.serialization import serialize
 
 
 class TransactionBase(SQLModel):
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), sa_column=Column(DateTime(timezone=True)))
     vertex_id: str = Field(nullable=False)
     target_id: str | None = Field(default=None)
     inputs: dict | None = Field(default=None, sa_column=Column(JSON))
