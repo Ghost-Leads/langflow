@@ -323,6 +323,3 @@ class LCBuiltinChatMemory(BaseChatMessageHistory):
 
     async def aclear(self) -> None:
         await adelete_messages(self.session_id)
-
-
-# test comment
