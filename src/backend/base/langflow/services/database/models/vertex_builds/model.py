@@ -3,14 +3,17 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, field_serializer, field_validator
 from sqlalchemy import Text
-from sqlmodel import JSON, Column, Field, SQLModel
+from sqlmodel import JSON, Column, DateTime, Field, SQLModel
 
 from langflow.serialization.constants import MAX_ITEMS_LENGTH, MAX_TEXT_LENGTH
 from langflow.serialization.serialization import serialize
 
 
 class VertexBuildBase(SQLModel):
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
     id: str = Field(nullable=False)
     data: dict | None = Field(default=None, sa_column=Column(JSON))
     artifacts: dict | None = Field(default=None, sa_column=Column(JSON))
