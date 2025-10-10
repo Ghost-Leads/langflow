@@ -158,7 +158,7 @@ class DatabaseService(Service):
             }
         # For PostgreSQL, set the timezone to UTC
         if settings.database_url and settings.database_url.startswith(("postgresql", "postgres")):
-            return {"options": "-c timezone=utc"}
+            return {"server_settings": {"timezone": "UTC"}}
         return {}
 
     def on_connection(self, dbapi_connection, _connection_record) -> None:
