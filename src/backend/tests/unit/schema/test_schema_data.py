@@ -40,6 +40,7 @@ class TestDataSchema:
 
         # Check image content
         assert message.content[1]["type"] == "image_url"
+        assert "image_url" in message.content[1]
         assert "url" in message.content[1]["image_url"]
         assert message.content[1]["image_url"]["url"].startswith("data:image/png;base64,")
 
@@ -67,8 +68,14 @@ class TestDataSchema:
 
         # Check both images
         assert message.content[1]["type"] == "image_url"
+        assert "image_url" in message.content[1]
+        assert "url" in message.content[1]["image_url"]
+        assert message.content[1]["image_url"]["url"].startswith("data:image/png;base64,")
+
         assert message.content[2]["type"] == "image_url"
-        assert all(content["image_url"]["url"].startswith("data:image/png;base64,") for content in message.content[1:])
+        assert "image_url" in message.content[2]
+        assert "url" in message.content[2]["image_url"]
+        assert message.content[2]["image_url"]["url"].startswith("data:image/png;base64,")
 
     def test_data_to_message_ai_response(self):
         """Test conversion of Data to AI Message."""

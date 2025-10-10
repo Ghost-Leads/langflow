@@ -55,6 +55,8 @@ class FrontendNode(BaseModel):
     """Whether the frontend node is in beta."""
     legacy: bool = False
     """Whether the frontend node is legacy."""
+    replacement: list[str] | None = None
+    """Replacement for the frontend node when it is deprecated."""
     error: str | None = None
     """Error message for the frontend node."""
     edited: bool = False
@@ -127,12 +129,16 @@ class FrontendNode(BaseModel):
 
     def validate_name_overlap(self) -> None:
         # Check if any of the output names overlap with the any of the inputs
-        output_names = [output.name for output in self.outputs]
+        output_names = [output.name for output in self.outputs if not output.allows_loop]
         input_names = [input_.name for input_ in self.template.fields]
         overlap = set(output_names).intersection(input_names)
         if overlap:
             overlap_str = ", ".join(f"'{x}'" for x in overlap)
-            msg = f"There should be no overlap between input and output names. Names {overlap_str} are duplicated."
+            msg = (
+                "There should be no overlap between input and output names. "
+                f"Names {overlap_str} are duplicated in component {self.display_name}. "
+                f"Inputs are {input_names} and outputs are {output_names}."
+            )
             raise ValueError(msg)
 
     def validate_attributes(self) -> None:

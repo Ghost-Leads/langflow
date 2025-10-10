@@ -34,7 +34,7 @@ test.skip(
     await page.getByTestId("sidebar-search-input").fill("openai");
     await page.waitForTimeout(1000);
     await page
-      .getByTestId("languagemodelsOpenAI")
+      .getByTestId("openaiOpenAI")
       .dragTo(page.locator('//*[@id="react-flow-id"]'));
     await page.mouse.up();
     await page.mouse.down();
@@ -76,6 +76,8 @@ test.skip(
       .dragTo(page.locator('//*[@id="react-flow-id"]'));
     await page.mouse.up();
     await page.mouse.down();
+    await page.getByTestId("canvas_controls_dropdown").click();
+
     await page.waitForSelector('[data-testid="fit_view"]', {
       timeout: 100000,
     });
@@ -85,6 +87,8 @@ test.skip(
     await page.getByTestId("zoom_out").click();
     await page.getByTestId("zoom_out").click();
     await page.getByTestId("zoom_out").click();
+    await page.getByTestId("canvas_controls_dropdown").click();
+
     const elementsOpenAiOutput = await page
       .getByTestId("handle-openaimodel-shownode-text-right")
       .all();

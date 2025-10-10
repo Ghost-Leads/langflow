@@ -486,6 +486,7 @@ class DropdownInput(BaseInputMixin, DropDownMixin, MetadataTraceMixin, ToolModeM
     options_metadata: list[dict[str, Any]] = Field(default_factory=list)
     combobox: CoalesceBool = False
     dialog_inputs: dict[str, Any] = Field(default_factory=dict)
+    external_options: dict[str, Any] = Field(default_factory=dict)
     toggle: bool = False
     toggle_disable: bool | None = None
     toggle_value: bool | None = None
@@ -622,6 +623,20 @@ class FileInput(BaseInputMixin, ListableInputMixin, FileMixin, MetadataTraceMixi
     field_type: SerializableFieldTypes = FieldTypes.FILE
 
 
+class McpInput(BaseInputMixin, MetadataTraceMixin):
+    """Represents a mcp input field.
+
+    This class represents a mcp input and provides functionality for handling mcp values.
+    It inherits from the `BaseInputMixin` and `MetadataTraceMixin` classes.
+
+    Attributes:
+        field_type (SerializableFieldTypes): The field type of the input. Defaults to FieldTypes.MCP.
+    """
+
+    field_type: SerializableFieldTypes = FieldTypes.MCP
+    value: dict[str, Any] = Field(default_factory=dict)
+
+
 class LinkInput(BaseInputMixin, LinkMixin):
     field_type: SerializableFieldTypes = FieldTypes.LINK
 
@@ -659,6 +674,7 @@ InputTypes: TypeAlias = (
     | FloatInput
     | HandleInput
     | IntInput
+    | McpInput
     | MultilineInput
     | MultilineSecretInput
     | NestedDictInput

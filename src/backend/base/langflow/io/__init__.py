@@ -1,4 +1,3 @@
-# noqa: A005
 from langflow.inputs import (
     BoolInput,
     CodeInput,
@@ -12,6 +11,7 @@ from langflow.inputs import (
     HandleInput,
     IntInput,
     LinkInput,
+    McpInput,
     MessageInput,
     MessageTextInput,
     MultilineInput,
@@ -44,6 +44,7 @@ __all__ = [
     "IntInput",
     "LinkInput",
     "LinkInput",
+    "McpInput",
     "MessageInput",
     "MessageTextInput",
     "MultilineInput",

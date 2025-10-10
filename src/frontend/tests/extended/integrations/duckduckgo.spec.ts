@@ -11,20 +11,25 @@ test(
     await page.getByTestId("sidebar-search-input").click();
     await page.getByTestId("sidebar-search-input").fill("duck");
 
-    await page.waitForSelector('[data-testid="searchDuckDuckGo Search"]', {
-      timeout: 3000,
-    });
+    await page.waitForSelector(
+      '[data-testid="disclosure-bundles-duckduckgo"]',
+      {
+        timeout: 3000,
+      },
+    );
 
     await page
-      .getByTestId("searchDuckDuckGo Search")
+      .getByTestId("duckduckgoDuckDuckGo Search")
       .hover()
       .then(async () => {
         await page
           .getByTestId("add-component-button-duckduckgo-search")
           .click();
       });
+    await page.getByTestId("canvas_controls_dropdown").click();
 
     await page.getByTestId("fit_view").click();
+    await page.getByTestId("canvas_controls_dropdown").click();
 
     await page
       .getByTestId("popover-anchor-input-input_value")

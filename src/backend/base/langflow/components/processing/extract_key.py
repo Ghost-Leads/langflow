@@ -1,6 +1,6 @@
-from langflow.custom import Component
+from langflow.custom.custom_component.component import Component
 from langflow.io import DataInput, Output, StrInput
-from langflow.schema import Data
+from langflow.schema.data import Data
 
 
 class ExtractDataKeyComponent(Component):
@@ -12,6 +12,7 @@ class ExtractDataKeyComponent(Component):
     icon = "key"
     name = "ExtractaKey"
     legacy = True
+    replacement = ["processing.DataOperations"]
 
     inputs = [
         DataInput(

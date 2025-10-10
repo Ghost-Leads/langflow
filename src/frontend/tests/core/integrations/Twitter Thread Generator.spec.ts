@@ -27,12 +27,18 @@ withEventDeliveryModes(
     await page
       .getByRole("heading", { name: "Twitter Thread Generator" })
       .click();
+    await page.getByTestId("canvas_controls_dropdown").click();
 
     await page.waitForSelector('[data-testid="fit_view"]', {
       timeout: 100000,
     });
+    await page.getByTestId("canvas_controls_dropdown").click();
 
     await initialGPTsetup(page);
+
+    await page.getByTestId("title-Chat Output").click();
+    await page.getByTestId("icon-MoreHorizontal").click();
+    await page.getByText("Expand").click();
 
     await page.getByTestId("button_run_chat output").click();
     await page.waitForSelector("text=built successfully", { timeout: 30000 });

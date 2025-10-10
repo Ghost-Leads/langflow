@@ -2,8 +2,8 @@ import re
 
 from langchain_core.prompts import HumanMessagePromptTemplate
 
-from langflow.custom import Component
-from langflow.inputs import DefaultPromptField, SecretStrInput, StrInput
+from langflow.custom.custom_component.component import Component
+from langflow.inputs.inputs import DefaultPromptField, SecretStrInput, StrInput
 from langflow.io import Output
 from langflow.schema.message import Message
 
@@ -19,7 +19,7 @@ class LangChainHubPromptComponent(Component):
     inputs = [
         SecretStrInput(
             name="langchain_api_key",
-            display_name="Your LangChain API Key",
+            display_name="LangChain API Key",
             info="The LangChain API Key to use.",
             required=True,
         ),

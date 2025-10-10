@@ -5,8 +5,7 @@ from pydantic import field_serializer, field_validator
 from sqlmodel import JSON, Column, Field, SQLModel
 from sqlalchemy import DateTime
 
-from langflow.serialization.constants import MAX_ITEMS_LENGTH, MAX_TEXT_LENGTH
-from langflow.serialization.serialization import serialize
+from langflow.serialization.serialization import get_max_items_length, get_max_text_length, serialize
 
 
 class TransactionBase(SQLModel):
@@ -34,11 +33,27 @@ class TransactionBase(SQLModel):
 
     @field_serializer("inputs")
     def serialize_inputs(self, data) -> dict:
-        return serialize(data, max_length=MAX_TEXT_LENGTH, max_items=MAX_ITEMS_LENGTH)
+        """Serialize the transaction's input data with enforced limits on text length and item count.
+
+        Parameters:
+            data (dict): The input data to be serialized.
+
+        Returns:
+            dict: The serialized input data with applied constraints.
+        """
+        return serialize(data, max_length=get_max_text_length(), max_items=get_max_items_length())
 
     @field_serializer("outputs")
     def serialize_outputs(self, data) -> dict:
-        return serialize(data, max_length=MAX_TEXT_LENGTH, max_items=MAX_ITEMS_LENGTH)
+        """Serialize the outputs dictionary with enforced limits on text length and item count.
+
+        Parameters:
+            data (dict): The outputs data to serialize.
+
+        Returns:
+            dict: The serialized outputs dictionary with applied constraints.
+        """
+        return serialize(data, max_length=get_max_text_length(), max_items=get_max_items_length())
 
 
 class TransactionTable(TransactionBase, table=True):  # type: ignore[call-arg]

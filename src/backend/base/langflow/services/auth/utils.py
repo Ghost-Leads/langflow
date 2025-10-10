@@ -10,10 +10,11 @@ from cryptography.fernet import Fernet
 from fastapi import Depends, HTTPException, Security, WebSocketException, status
 from fastapi.security import APIKeyHeader, APIKeyQuery, OAuth2PasswordBearer
 from jose import JWTError, jwt
-from loguru import logger
+from sqlalchemy.exc import IntegrityError
 from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.websockets import WebSocket
 
+from langflow.logging.logger import logger
 from langflow.services.database.models.api_key.crud import check_key
 from langflow.services.database.models.user.crud import get_user_by_id, get_user_by_username, update_user_last_login_at
 from langflow.services.database.models.user.model import User, UserRead
@@ -31,6 +32,12 @@ api_key_query = APIKeyQuery(name=API_KEY_NAME, scheme_name="API key query", auto
 api_key_header = APIKeyHeader(name=API_KEY_NAME, scheme_name="API key header", auto_error=False)
 
 MINIMUM_KEY_LENGTH = 32
+AUTO_LOGIN_WARNING = "In v2.0, LANGFLOW_SKIP_AUTH_AUTO_LOGIN will be removed. Please update your authentication method."
+AUTO_LOGIN_ERROR = (
+    "Since v1.5, LANGFLOW_AUTO_LOGIN requires a valid API key. "
+    "Set LANGFLOW_SKIP_AUTH_AUTO_LOGIN=true to skip this check. "
+    "Please update your authentication method."
+)
 
 
 # Source: https://github.com/mrtolkien/fastapi_simple_security/blob/master/fastapi_simple_security/security_api_key.py
@@ -49,19 +56,16 @@ async def api_key_security(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Missing first superuser credentials",
                 )
-            warnings.warn(
-                (
-                    "In v1.5, the default behavior of AUTO_LOGIN authentication will change to require a valid API key"
-                    " or JWT. If you integrated with Langflow prior to v1.5, make sure to update your code to pass an "
-                    "API key or JWT when authenticating with protected endpoints."
-                ),
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            if query_param or header_param:
-                result = await check_key(db, query_param or header_param)
-            else:
-                result = await get_user_by_username(db, settings_service.auth_settings.SUPERUSER)
+            if not query_param and not header_param:
+                if settings_service.auth_settings.skip_auth_auto_login:
+                    result = await get_user_by_username(db, settings_service.auth_settings.SUPERUSER)
+                    logger.warning(AUTO_LOGIN_WARNING)
+                    return UserRead.model_validate(result, from_attributes=True)
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=AUTO_LOGIN_ERROR,
+                )
+            result = await check_key(db, query_param or header_param)
 
         elif not query_param and not header_param:
             raise HTTPException(
@@ -69,19 +73,18 @@ async def api_key_security(
                 detail="An API key must be passed as query or header",
             )
 
-        elif query_param:
-            result = await check_key(db, query_param)
-
         else:
-            result = await check_key(db, header_param)
+            result = await check_key(db, query_param or header_param)
 
         if not result:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Invalid or missing API key",
             )
+
         if isinstance(result, User):
             return UserRead.model_validate(result, from_attributes=True)
+
     msg = "Invalid result type"
     raise ValueError(msg)
 
@@ -98,15 +101,17 @@ async def ws_api_key_security(
                     code=status.WS_1011_INTERNAL_ERROR,
                     reason="Missing first superuser credentials",
                 )
-            warnings.warn(
-                ("In v1.5, AUTO_LOGIN will *require* a valid API key or JWT. Please update your clients accordingly."),
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            if api_key:
-                result = await check_key(db, api_key)
+            if not api_key:
+                if settings.auth_settings.skip_auth_auto_login:
+                    result = await get_user_by_username(db, settings.auth_settings.SUPERUSER)
+                    logger.warning(AUTO_LOGIN_WARNING)
+                else:
+                    raise WebSocketException(
+                        code=status.WS_1008_POLICY_VIOLATION,
+                        reason=AUTO_LOGIN_ERROR,
+                    )
             else:
-                result = await get_user_by_username(db, settings.auth_settings.SUPERUSER)
+                result = await check_key(db, api_key)
 
         # normal path: must provide an API key
         else:
@@ -295,17 +300,38 @@ async def create_super_user(
         )
 
         db.add(super_user)
-        await db.commit()
-        await db.refresh(super_user)
+        try:
+            await db.commit()
+            await db.refresh(super_user)
+        except IntegrityError:
+            # Race condition - another worker created the user
+            await db.rollback()
+            super_user = await get_user_by_username(db, username)
+            if not super_user:
+                raise  # Re-raise if it's not a race condition
+        except Exception:  # noqa: BLE001
+            logger.debug("Error creating superuser.", exc_info=True)
 
     return super_user
 
 
 async def create_user_longterm_token(db: AsyncSession) -> tuple[UUID, dict]:
     settings_service = get_settings_service()
+    if not settings_service.auth_settings.AUTO_LOGIN:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Auto login required to create a long-term token"
+        )
 
+    # Prefer configured username; fall back to default or any existing superuser
+    # NOTE: This user name cannot be a dynamic current user name since it is only used when autologin is True
     username = settings_service.auth_settings.SUPERUSER
     super_user = await get_user_by_username(db, username)
+    if not super_user:
+        from langflow.services.database.models.user.crud import get_all_superusers
+
+        superusers = await get_all_superusers(db)
+        super_user = superusers[0] if superusers else None
+
     if not super_user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Super user hasn't been created")
     access_token_expires_longterm = timedelta(days=365)
@@ -382,13 +408,17 @@ async def create_refresh_token(refresh_token: str, db: AsyncSession):
         user_id: UUID = payload.get("sub")  # type: ignore[assignment]
         token_type: str = payload.get("type")  # type: ignore[assignment]
 
-        if user_id is None or token_type == "":
+        if user_id is None or token_type != "refresh":  # noqa: S105
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
         user_exists = await get_user_by_id(db, user_id)
 
         if user_exists is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+
+        # Security: Check if user is still active
+        if not user_exists.is_active:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User account is inactive")
 
         return await create_user_tokens(user_id, db)
 
@@ -473,3 +503,81 @@ def decrypt_api_key(encrypted_api_key: str, settings_service: SettingsService):
             )
             return fernet.decrypt(encrypted_api_key).decode()
     return ""
+
+
+# MCP-specific authentication functions that always behave as if skip_auth_auto_login is True
+async def get_current_user_mcp(
+    token: Annotated[str, Security(oauth2_login)],
+    query_param: Annotated[str, Security(api_key_query)],
+    header_param: Annotated[str, Security(api_key_header)],
+    db: Annotated[AsyncSession, Depends(get_session)],
+) -> User:
+    """MCP-specific user authentication that always allows fallback to username lookup.
+
+    This function provides authentication for MCP endpoints with special handling:
+    - If a JWT token is provided, it uses standard JWT authentication
+    - If no API key is provided and AUTO_LOGIN is enabled, it falls back to
+      username lookup using the configured superuser credentials
+    - Otherwise, it validates the provided API key (from query param or header)
+    """
+    if token:
+        return await get_current_user_by_jwt(token, db)
+
+    # MCP-specific authentication logic - always behaves as if skip_auth_auto_login is True
+    settings_service = get_settings_service()
+    result: ApiKey | User | None
+
+    if settings_service.auth_settings.AUTO_LOGIN:
+        # Get the first user
+        if not settings_service.auth_settings.SUPERUSER:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing first superuser credentials",
+            )
+        if not query_param and not header_param:
+            # For MCP endpoints, always fall back to username lookup when no API key is provided
+            result = await get_user_by_username(db, settings_service.auth_settings.SUPERUSER)
+            if result:
+                logger.warning(AUTO_LOGIN_WARNING)
+                return result
+        else:
+            result = await check_key(db, query_param or header_param)
+
+    elif not query_param and not header_param:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="An API key must be passed as query or header",
+        )
+
+    elif query_param:
+        result = await check_key(db, query_param)
+
+    else:
+        result = await check_key(db, header_param)
+
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid or missing API key",
+        )
+
+    # If result is a User, return it directly
+    if isinstance(result, User):
+        return result
+
+    # If result is an ApiKey, we need to get the associated user
+    # This should not happen in normal flow, but adding for completeness
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Invalid authentication result",
+    )
+
+
+async def get_current_active_user_mcp(current_user: Annotated[User, Depends(get_current_user_mcp)]):
+    """MCP-specific active user dependency.
+
+    This dependency is temporary and will be removed once MCP is fully integrated.
+    """
+    if not current_user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Inactive user")
+    return current_user

@@ -11,12 +11,13 @@ from uuid import UUID
 
 from fastapi.encoders import jsonable_encoder
 from langchain_core.load import load
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
-from langchain_core.prompts import BaseChatPromptTemplate, ChatPromptTemplate, PromptTemplate
-from loguru import logger
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.prompts.chat import BaseChatPromptTemplate, ChatPromptTemplate
+from langchain_core.prompts.prompt import PromptTemplate
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_serializer, field_validator
 
 from langflow.base.prompts.utils import dict_values_to_string
+from langflow.logging.logger import logger
 from langflow.schema.content_block import ContentBlock
 from langflow.schema.content_types import ErrorContent
 from langflow.schema.data import Data
@@ -29,7 +30,7 @@ from langflow.utils.constants import (
     MESSAGE_SENDER_NAME_USER,
     MESSAGE_SENDER_USER,
 )
-from langflow.utils.image import create_data_url
+from langflow.utils.image import create_image_content_dict
 
 if TYPE_CHECKING:
     from langflow.schema.dataframe import DataFrame
@@ -143,7 +144,8 @@ class Message(Data):
         if self.sender == MESSAGE_SENDER_USER or not self.sender:
             if self.files:
                 contents = [{"type": "text", "text": text}]
-                contents.extend(self.get_file_content_dicts())
+                file_contents = self.get_file_content_dicts()
+                contents.extend(file_contents)
                 human_message = HumanMessage(content=contents)
             else:
                 human_message = HumanMessage(content=text)
@@ -162,6 +164,9 @@ class Message(Data):
         elif lc_message.type == "system":
             sender = "System"
             sender_name = "System"
+        elif lc_message.type == "tool":
+            sender = "Tool"
+            sender_name = "Tool"
         else:
             sender = lc_message.type
             sender_name = lc_message.type
@@ -199,14 +204,17 @@ class Message(Data):
     # Keep this async method for backwards compatibility
     def get_file_content_dicts(self):
         content_dicts = []
-        files = get_file_paths(self.files)
+        try:
+            files = get_file_paths(self.files)
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Error getting file paths: {e}")
+            return content_dicts
 
         for file in files:
             if isinstance(file, Image):
                 content_dicts.append(file.to_content_dict())
             else:
-                image_url = create_data_url(file)
-                content_dicts.append({"type": "image_url", "image_url": {"url": image_url}})
+                content_dicts.append(create_image_content_dict(file))
         return content_dicts
 
     def load_lc_prompt(self):
@@ -227,6 +235,8 @@ class Message(Data):
                     messages.append(SystemMessage(content=message.get("content")))
                 case _ if message.get("type") == "ai":
                     messages.append(AIMessage(content=message.get("content")))
+                case _ if message.get("type") == "tool":
+                    messages.append(ToolMessage(content=message.get("content")))
 
         self.prompt["kwargs"]["messages"] = messages
         return load(self.prompt)
@@ -402,12 +412,18 @@ class ErrorMessage(Message):
         """Format the error reason without markdown."""
         if hasattr(exception, "body") and isinstance(exception.body, dict) and "message" in exception.body:
             reason = f"{exception.body.get('message')}\n"
+        elif hasattr(exception, "_message"):
+            reason = f"{exception._message()}\n" if callable(exception._message) else f"{exception._message}\n"
         elif hasattr(exception, "code"):
             reason = f"Code: {exception.code}\n"
         elif hasattr(exception, "args") and exception.args:
             reason = f"{exception.args[0]}\n"
         elif isinstance(exception, ValidationError):
             reason = f"{exception!s}\n"
+        elif hasattr(exception, "detail"):
+            reason = f"{exception.detail}\n"
+        elif hasattr(exception, "message"):
+            reason = f"{exception.message}\n"
         else:
             reason = "An unknown error occurred.\n"
         return reason

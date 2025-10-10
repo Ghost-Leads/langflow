@@ -1,9 +1,9 @@
 from langchain_community.document_loaders import ConfluenceLoader
 from langchain_community.document_loaders.confluence import ContentFormat
 
-from langflow.custom import Component
+from langflow.custom.custom_component.component import Component
 from langflow.io import BoolInput, DropdownInput, IntInput, Output, SecretStrInput, StrInput
-from langflow.schema import Data
+from langflow.schema.data import Data
 
 
 class ConfluenceComponent(Component):
@@ -29,7 +29,7 @@ class ConfluenceComponent(Component):
         ),
         SecretStrInput(
             name="api_key",
-            display_name="API Key",
+            display_name="Confluence API Key",
             required=True,
             info="Atlassian Key. Create at: https://id.atlassian.com/manage-profile/security/api-tokens",
         ),
