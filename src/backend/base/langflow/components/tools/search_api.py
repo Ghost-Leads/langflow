@@ -6,17 +6,18 @@ from pydantic import BaseModel, Field
 
 from langflow.base.langchain_utilities.model import LCToolComponent
 from langflow.field_typing import Tool
-from langflow.inputs import DictInput, IntInput, MessageTextInput, MultilineInput, SecretStrInput
-from langflow.schema import Data
+from langflow.inputs.inputs import DictInput, IntInput, MessageTextInput, MultilineInput, SecretStrInput
+from langflow.schema.data import Data
 
 
 class SearchAPIComponent(LCToolComponent):
-    display_name: str = "Search API [DEPRECATED]"
+    display_name: str = "Search API"
     description: str = "Call the searchapi.io API with result limiting"
     name = "SearchAPI"
     documentation: str = "https://www.searchapi.io/docs/google"
     icon = "SearchAPI"
     legacy = True
+    replacement = ["searchapi.SearchComponent"]
 
     inputs = [
         MessageTextInput(name="engine", display_name="Engine", value="google"),

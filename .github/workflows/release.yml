@@ -4,6 +4,10 @@ run-name: Langflow Release by @${{ github.actor }}
 on:
   workflow_dispatch:
     inputs:
+      release_branch:
+        description: "Branch to release from. This is the branch that contains the source code for the release."
+        required: true
+        type: string
       release_package_base:
         description: "Release Langflow Base"
         required: true
@@ -41,18 +45,22 @@ on:
         default: true
 
 
+
 jobs:
   ci:
     if: ${{ github.event.inputs.release_package_base == 'true' || github.event.inputs.release_package_main == 'true' }}
     name: CI
     uses: ./.github/workflows/ci.yml
     with:
+      branch: ${{ inputs.release_branch }}
       python-versions: "['3.10', '3.11', '3.12', '3.13']"
       frontend-tests-folder: "tests"
       release: true
+    secrets: inherit
 
-  release-base:
-    name: Release Langflow Base
+
+  build-base:
+    name: Build Langflow Base
     needs: [ci]
     if: inputs.release_package_base == true
     runs-on: ubuntu-latest
@@ -62,10 +70,25 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_branch }}
+      - name: Debug branch information
+        run: |
+          echo "Workflow triggered from: ${{ github.ref }}"
+          echo "Checking out branch: ${{ inputs.release_branch }}"
+          echo "Current branch after checkout: $(git branch --show-current)"
+          echo "Current commit: $(git rev-parse HEAD)"
       - name: Setup Environment
-        uses: ./.github/actions/setup-uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          python-version: "3.13"
+          prune-cache: false
       - name: Install the project
         run: uv sync
+      - name: Check for dependency incompatibility
+        run: uv pip check
       - name: Check Version
         id: check-version
         run: |
@@ -89,10 +112,10 @@ jobs:
           mkdir src/backend/base/dist
           mv dist/*.whl src/backend/base/dist
           uv pip install src/backend/base/dist/*.whl
-          uv run python -m langflow run --host 127.0.0.1 --port 7860 --backend-only &
+          uv run python -m langflow run --host localhost --port 7860 --backend-only &
           SERVER_PID=$!
           # Wait for the server to start
-          timeout 120 bash -c 'until curl -f http://127.0.0.1:7860/api/v1/auto_login; do sleep 2; done' || (echo "Server did not start in time" && kill $SERVER_PID && exit 1)
+          timeout 120 bash -c 'until curl -f http://localhost:7860/api/v1/auto_login; do sleep 2; done' || (echo "Server did not start in time" && kill $SERVER_PID && exit 1)
           # Terminate the server
           kill $SERVER_PID || (echo "Failed to terminate the server" && exit 1)
           sleep 20 # give the server some time to terminate
@@ -103,12 +126,9 @@ jobs:
           else
             echo "Server terminated successfully"
           fi
-      - name: Publish to PyPI
-        if: steps.check-version.outputs.skipped == 'false'
-        env:
-          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
-          make publish base=true
+
+      # PyPI publishing moved to after cross-platform testing
+
       - name: Upload Artifact
         if: steps.check-version.outputs.skipped == 'false'
         uses: actions/upload-artifact@v4
@@ -116,20 +136,35 @@ jobs:
           name: dist-base
           path: src/backend/base/dist
 
-  release-main:
-    name: Release Langflow Main
+  build-main:
+    name: Build Langflow Main
     if: inputs.release_package_main == true
-    needs: [release-base]
+    needs: [build-base]
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.check-version.outputs.version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_branch }}
+      - name: Debug branch information
+        run: |
+          echo "Workflow triggered from: ${{ github.ref }}"
+          echo "Checking out branch: ${{ inputs.release_branch }}"
+          echo "Current branch after checkout: $(git branch --show-current)"
+          echo "Current commit: $(git rev-parse HEAD)"
       - name: Setup Environment
-        uses: ./.github/actions/setup-uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          python-version: "3.13"
+          prune-cache: false
       - name: Install the project
         run: uv sync
+      - name: Check for dependency incompatibility
+        run: uv pip check
 
       # If pre-release is true, we need to check if  ["a", "b", "rc", "dev", "post"] is in the version string
       # if the version string is incorrect, we need to exit the workflow
@@ -155,7 +190,7 @@ jobs:
             echo version=$version >> $GITHUB_OUTPUT
           fi
       - name: Wait for PyPI Propagation
-        if: needs.release-base.outputs.skipped == 'false'
+        if: needs.build-base.outputs.skipped == 'false'
         run: sleep 300 # wait for 5 minutes to ensure PyPI propagation
 
       - name: Build project for distribution
@@ -163,10 +198,10 @@ jobs:
       - name: Test CLI
         run: |
           uv pip install dist/*.whl
-          uv run python -m langflow run --host 127.0.0.1 --port 7860 --backend-only &
+          uv run python -m langflow run --host localhost --port 7860 --backend-only &
           SERVER_PID=$!
           # Wait for the server to start
-          timeout 120 bash -c 'until curl -f http://127.0.0.1:7860/health_check; do sleep 2; done' || (echo "Server did not start in time" && kill $SERVER_PID && exit 1)
+          timeout 120 bash -c 'until curl -f http://localhost:7860/health_check; do sleep 2; done' || (echo "Server did not start in time" && kill $SERVER_PID && exit 1)
           # Terminate the server
           kill $SERVER_PID || (echo "Failed to terminate the server" && exit 1)
           sleep 20 # give the server some time to terminate
@@ -177,25 +212,78 @@ jobs:
           else
             echo "Server terminated successfully"
           fi
-      - name: Publish to PyPI
-        env:
-          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
-          make publish main=true
+
+      # PyPI publishing moved to after cross-platform testing
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: dist-main
           path: dist
 
+  test-cross-platform:
+    name: Test Cross-Platform Installation
+    if: inputs.release_package_base == true || inputs.release_package_main == true
+    needs: [build-base, build-main]
+    uses: ./.github/workflows/cross-platform-test.yml
+    with:
+      base-artifact-name: "dist-base"
+      main-artifact-name: "dist-main"
+
+  publish-base:
+    name: Publish Langflow Base to PyPI
+    if: inputs.release_package_base == true
+    needs: [build-base, test-cross-platform]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download base artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-base
+          path: src/backend/base/dist
+      - name: Setup Environment
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: false
+          python-version: "3.13"
+      - name: Publish base to PyPI
+        if: needs.build-base.outputs.skipped == 'false'
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          cd src/backend/base && uv publish dist/*.whl
+
+  publish-main:
+    name: Publish Langflow Main to PyPI
+    if: inputs.release_package_main == true
+    needs: [build-main, test-cross-platform, publish-base]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download main artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-main
+          path: dist
+      - name: Setup Environment
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: false
+          python-version: "3.13"
+      - name: Publish main to PyPI
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          uv publish dist/*.whl
+
   call_docker_build_base:
     name: Call Docker Build Workflow for Langflow Base
     if: inputs.build_docker_base == true
-    needs: [release-base, release-main]
+    needs: [build-base, build-main, publish-base, publish-main]
     uses: ./.github/workflows/docker-build.yml
     with:
-      base_version: ${{ needs.release-base.outputs.version }}
-      main_version: ${{ needs.release-main.outputs.version }}
+      ref: ${{ inputs.release_branch }}
+      base_version: ${{ needs.build-base.outputs.version }}
+      main_version: ${{ needs.build-main.outputs.version }}
       release_type: base
       pre_release: ${{ inputs.pre_release }}
     secrets: inherit
@@ -203,10 +291,11 @@ jobs:
   call_docker_build_main_ep:
     name: Call Docker Build Workflow for Langflow with Entrypoint
     if: inputs.build_docker_ep == true
-    needs: [release-main, call_docker_build_base]
+    needs: [build-main, publish-main, call_docker_build_base]
     uses: ./.github/workflows/docker-build.yml
     with:
-      main_version: ${{ needs.release-main.outputs.version }}
+      ref: ${{ inputs.release_branch }}
+      main_version: ${{ needs.build-main.outputs.version }}
       release_type: main-ep
       pre_release: False
     secrets: inherit
@@ -214,10 +303,11 @@ jobs:
   call_docker_build_main:
     name: Call Docker Build Workflow for Langflow
     if: inputs.build_docker_main == true
-    needs: [release-main, call_docker_build_main_ep]
+    needs: [build-main, publish-main, call_docker_build_main_ep]
     uses: ./.github/workflows/docker-build.yml
     with:
-      main_version: ${{ needs.release-main.outputs.version }}
+      ref: ${{ inputs.release_branch }}
+      main_version: ${{ needs.build-main.outputs.version }}
       release_type: main
       pre_release: ${{ inputs.pre_release }}
     secrets: inherit
@@ -225,29 +315,20 @@ jobs:
   call_docker_build_main_all:
     name: Call Docker Build Workflow for langflow-all
     if: inputs.build_docker_main == true
-    needs: [release-main]
+    needs: [build-main, publish-main]
     uses: ./.github/workflows/docker-build.yml
     with:
-      main_version: ${{ needs.release-main.outputs.version }}
+      ref: ${{ inputs.release_branch }}
+      main_version: ${{ needs.build-main.outputs.version }}
       release_type: main-all
       pre_release: ${{ inputs.pre_release }}
     secrets: inherit
 
-  call_docker_build_main_ep:
-    name: Call Docker Build Workflow for Langflow with Entrypoint
-    if: inputs.build_docker_ep == true
-    needs: [release-main]
-    uses: ./.github/workflows/docker-build.yml
-    with:
-      main_version: ${{ needs.release-main.outputs.version }}
-      release_type: main-ep
-      pre_release: False
-    secrets: inherit
 
   create_release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: release-main
+    needs: [build-main, publish-main]
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -261,5 +342,5 @@ jobs:
           draft: false
           generateReleaseNotes: true
           prerelease: ${{ inputs.pre_release }}
-          tag: ${{ needs.release-main.outputs.version }}
-          commit: ${{ github.ref }}
+          tag: ${{ needs.build-main.outputs.version }}
+          commit: ${{ inputs.release_branch }}

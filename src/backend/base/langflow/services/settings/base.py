@@ -9,17 +9,13 @@ from typing import Any, Literal
 import orjson
 import yaml
 from aiofile import async_open
-from loguru import logger
 from pydantic import Field, field_validator
 from pydantic.fields import FieldInfo
-from pydantic_settings import (
-    BaseSettings,
-    EnvSettingsSource,
-    PydanticBaseSettingsSource,
-    SettingsConfigDict,
-)
+from pydantic_settings import BaseSettings, EnvSettingsSource, PydanticBaseSettingsSource, SettingsConfigDict
 from typing_extensions import override
 
+from langflow.logging.logger import logger
+from langflow.serialization.constants import MAX_ITEMS_LENGTH, MAX_TEXT_LENGTH
 from langflow.services.settings.constants import VARIABLES_TO_GET_FROM_ENVIRONMENT
 from langflow.utils.util_strings import is_valid_database_url
 
@@ -72,6 +68,9 @@ class Settings(BaseSettings):
     """Define if langflow database should be saved in LANGFLOW_CONFIG_DIR or in the langflow directory
     (i.e. in the package directory)."""
 
+    knowledge_bases_dir: str | None = "~/.langflow/knowledge_bases"
+    """The directory to store knowledge bases."""
+
     dev: bool = False
     """If True, Langflow will run in development mode."""
     database_url: str | None = None
@@ -90,6 +89,26 @@ class Settings(BaseSettings):
     db_connect_timeout: int = 30
     """The number of seconds to wait before giving up on a lock to released or establishing a connection to the
     database."""
+
+    mcp_server_timeout: int = 20
+    """The number of seconds to wait before giving up on a lock to released or establishing a connection to the
+    database."""
+
+    # ---------------------------------------------------------------------
+    # MCP Session-manager tuning
+    # ---------------------------------------------------------------------
+    mcp_max_sessions_per_server: int = 10
+    """Maximum number of MCP sessions to keep per unique server (command/url).
+    Mirrors the default constant MAX_SESSIONS_PER_SERVER in util.py. Adjust to
+    control resource usage or concurrency per server."""
+
+    mcp_session_idle_timeout: int = 400  # seconds
+    """How long (in seconds) an MCP session can stay idle before the background
+    cleanup task disposes of it. Defaults to 5 minutes."""
+
+    mcp_session_cleanup_interval: int = 120  # seconds
+    """Frequency (in seconds) at which the background cleanup task wakes up to
+    reap idle sessions."""
 
     # sqlite configuration
     sqlite_pragmas: dict | None = {"synchronous": "NORMAL", "journal_mode": "WAL"}
@@ -120,6 +139,10 @@ class Settings(BaseSettings):
     - pool_recycle: Seconds before connections are recycled (prevents timeouts)
     - echo: Enable SQL query logging (development only)
     """
+
+    use_noop_database: bool = False
+    """If True, disables all database operations and uses a no-op session.
+    Controlled by LANGFLOW_USE_NOOP_DATABASE env variable."""
 
     # cache configuration
     cache_type: Literal["async", "redis", "memory", "disk"] = "async"
@@ -179,6 +202,18 @@ class Settings(BaseSettings):
     backend_only: bool = False
     """If set to True, Langflow will not serve the frontend."""
 
+    # CORS Settings
+    cors_origins: list[str] | str = "*"
+    """Allowed origins for CORS. Can be a list of origins or '*' for all origins.
+    Default is '*' for backward compatibility. In production, specify exact origins."""
+    cors_allow_credentials: bool = True
+    """Whether to allow credentials in CORS requests.
+    Default is True for backward compatibility. In v1.7, this will be changed to False when using wildcard origins."""
+    cors_allow_methods: list[str] | str = "*"
+    """Allowed HTTP methods for CORS requests."""
+    cors_allow_headers: list[str] | str = "*"
+    """Allowed headers for CORS requests."""
+
     # Telemetry
     do_not_track: bool = False
     """If set to True, Langflow will not track telemetry."""
@@ -189,7 +224,7 @@ class Settings(BaseSettings):
     """If set to True, Langflow will keep track of each vertex builds (outputs) in the UI for any flow."""
 
     # Config
-    host: str = "127.0.0.1"
+    host: str = "localhost"
     """The host on which Langflow will run."""
     port: int = 7860
     """The port on which Langflow will run."""
@@ -211,7 +246,7 @@ class Settings(BaseSettings):
     """The interval in ms at which Langflow will auto save flows."""
     health_check_max_retries: int = 5
     """The maximum number of retries for the health check."""
-    max_file_size_upload: int = 100
+    max_file_size_upload: int = 1024
     """The maximum file size for the upload in MB."""
     deactivate_tracing: bool = False
     """If set to True, tracing will be deactivated."""
@@ -229,12 +264,22 @@ class Settings(BaseSettings):
     """Path to the SSL certificate file on the local system."""
     ssl_key_file: str | None = None
     """Path to the SSL key file on the local system."""
+    max_text_length: int = MAX_TEXT_LENGTH
+    """Maximum number of characters to store and display in the UI. Responses longer than this
+    will be truncated when displayed in the UI. Does not truncate responses between components nor outputs."""
+    max_items_length: int = MAX_ITEMS_LENGTH
+    """Maximum number of items to store and display in the UI. Lists longer than this
+    will be truncated when displayed in the UI. Does not affect data passed between components nor outputs."""
 
     # MCP Server
     mcp_server_enabled: bool = True
     """If set to False, Langflow will not enable the MCP server."""
     mcp_server_enable_progress_notifications: bool = False
     """If set to False, Langflow will not send progress notifications in the MCP server."""
+
+    # MCP Composer
+    mcp_composer_enabled: bool = True
+    """If set to False, Langflow will not start the MCP Composer service."""
 
     # Public Flow Settings
     public_flow_cleanup_interval: int = Field(default=3600, gt=600)
@@ -248,6 +293,33 @@ class Settings(BaseSettings):
     lazy_load_components: bool = False
     """If set to True, Langflow will only partially load components at startup and fully load them on demand.
     This significantly reduces startup time but may cause a slight delay when a component is first used."""
+
+    # Starter Projects
+    create_starter_projects: bool = True
+    """If set to True, Langflow will create starter projects. If False, skips all starter project setup.
+    Note that this doesn't check if the starter projects are already loaded in the db;
+    this is intended to be used to skip all startup project logic."""
+    update_starter_projects: bool = True
+    """If set to True, Langflow will update starter projects."""
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def validate_cors_origins(cls, value):
+        """Convert comma-separated string to list if needed."""
+        if isinstance(value, str) and value != "*":
+            if "," in value:
+                # Convert comma-separated string to list
+                return [origin.strip() for origin in value.split(",")]
+            # Convert single origin to list for consistency
+            return [value]
+        return value
+
+    @field_validator("use_noop_database", mode="before")
+    @classmethod
+    def set_use_noop_database(cls, value):
+        if value:
+            logger.info("Running with NOOP database session. All DB operations are disabled.")
+        return value
 
     @field_validator("event_delivery", mode="before")
     @classmethod
@@ -394,6 +466,12 @@ class Settings(BaseSettings):
     @field_validator("components_path", mode="before")
     @classmethod
     def set_components_path(cls, value):
+        """Processes and updates the components path list, incorporating environment variable overrides.
+
+        If the `LANGFLOW_COMPONENTS_PATH` environment variable is set and points to an existing path, it is
+        appended to the provided list if not already present. If the input list is empty or missing, it is
+        set to an empty list.
+        """
         if os.getenv("LANGFLOW_COMPONENTS_PATH"):
             logger.debug("Adding LANGFLOW_COMPONENTS_PATH to components_path")
             langflow_component_path = os.getenv("LANGFLOW_COMPONENTS_PATH")
@@ -410,8 +488,11 @@ class Settings(BaseSettings):
         if not value:
             value = [BASE_COMPONENTS_PATH]
             logger.debug("Setting default components path to components_path")
-        elif BASE_COMPONENTS_PATH not in value:
-            value.append(BASE_COMPONENTS_PATH)
+        else:
+            if isinstance(value, Path):
+                value = [str(value)]
+            elif isinstance(value, list):
+                value = [str(p) if isinstance(p, Path) else p for p in value]
             logger.debug("Adding default components path to components_path")
 
         logger.debug(f"Components path: {value}")
@@ -454,6 +535,16 @@ class Settings(BaseSettings):
                 logger.debug(f"Updated {key}")
             logger.debug(f"{key}: {getattr(self, key)}")
 
+    @property
+    def voice_mode_available(self) -> bool:
+        """Check if voice mode is available by testing webrtcvad import."""
+        try:
+            import webrtcvad  # noqa: F401
+        except ImportError:
+            return False
+        else:
+            return True
+
     @classmethod
     @override
     def settings_customise_sources(  # type: ignore[misc]
@@ -491,6 +582,6 @@ async def load_settings_from_yaml(file_path: str) -> Settings:
             if key not in Settings.model_fields:
                 msg = f"Key {key} not found in settings"
                 raise KeyError(msg)
-            logger.debug(f"Loading {len(settings_dict[key])} {key} from {file_path}")
+            await logger.adebug(f"Loading {len(settings_dict[key])} {key} from {file_path}")
 
     return await asyncio.to_thread(Settings, **settings_dict)

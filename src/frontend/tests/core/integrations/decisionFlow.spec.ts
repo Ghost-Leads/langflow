@@ -32,9 +32,9 @@ test(
     await page.waitForSelector('[data-testid="input_outputChat Input"]', {
       timeout: 2000,
     });
-
+    await page.getByTestId("canvas_controls_dropdown").click();
     await zoomOut(page, 6);
-
+    await page.getByTestId("canvas_controls_dropdown").click();
     await page
       .getByTestId("input_outputChat Input")
       .dragTo(page.locator('//*[@id="react-flow-id"]'), {
@@ -152,11 +152,11 @@ test(
     //---------------------------------- PROMPT
     await page.getByTestId("sidebar-search-input").click();
     await page.getByTestId("sidebar-search-input").fill("prompt");
-    await page.waitForSelector('[data-testid="promptsPrompt"]', {
+    await page.waitForSelector('[data-testid="processingPrompt Template"]', {
       timeout: 2000,
     });
     await page
-      .getByTestId("promptsPrompt")
+      .getByTestId("processingPrompt Template")
       .dragTo(page.locator('//*[@id="react-flow-id"]'), {
         targetPosition: { x: 350, y: 300 },
       });
@@ -164,14 +164,11 @@ test(
     //---------------------------------- OPENAI
     await page.getByTestId("sidebar-search-input").click();
     await page.getByTestId("sidebar-search-input").fill("openai");
-    await page.waitForSelector(
-      '[data-testid="languagemodels_openai_draggable"]',
-      {
-        timeout: 2000,
-      },
-    );
+    await page.waitForSelector('[data-testid="openai_openai_draggable"]', {
+      timeout: 2000,
+    });
     await page
-      .getByTestId("languagemodelsOpenAI")
+      .getByTestId("openaiOpenAI")
       .dragTo(page.locator('//*[@id="react-flow-id"]'), {
         targetPosition: { x: 500, y: 300 },
       });
@@ -216,10 +213,17 @@ test(
       timeout: 2000,
     });
     //----------------------------------
+    await page.getByTestId("canvas_controls_dropdown").click();
+
     await page.getByTestId("fit_view").click();
+    await page.getByTestId("canvas_controls_dropdown").click();
+
     //---------------------------------- EDIT PROMPT
     await page.getByTestId("promptarea_prompt_template").first().click();
-    await page.getByTestId("modal-promptarea_prompt_template").first().fill(`
+    await page
+      .getByTestId("modal-promptarea_prompt_template")
+      .first()
+      .fill(`
       {Condition}
   Answer with either TRUE or FALSE (and nothing else).
   TRUE Examples:
@@ -261,7 +265,7 @@ test(
       .click();
     //quebrando aqui
     await page
-      .getByTestId("handle-prompt-shownode-true_examples-left")
+      .getByTestId("handle-prompt template-shownode-true_examples-left")
       .nth(0)
       .click();
     await page
@@ -269,7 +273,7 @@ test(
       .nth(1)
       .click();
     await page
-      .getByTestId("handle-prompt-shownode-false_examples-left")
+      .getByTestId("handle-prompt template-shownode-false_examples-left")
       .nth(0)
       .click();
     await page
@@ -277,11 +281,11 @@ test(
       .nth(2)
       .click();
     await page
-      .getByTestId("handle-prompt-shownode-user_message-left")
+      .getByTestId("handle-prompt template-shownode-user_message-left")
       .nth(0)
       .click();
     await page
-      .getByTestId("handle-prompt-shownode-prompt-right")
+      .getByTestId("handle-prompt template-shownode-prompt-right")
       .first()
       .click();
     await page
@@ -353,7 +357,11 @@ test(
     }
     await page.getByTestId("dropdown_str_model_name").click();
     await page.getByTestId("gpt-4o-1-option").click();
+    await page.getByTestId("canvas_controls_dropdown").click();
+
     await page.getByTestId("fit_view").click();
+    await page.getByTestId("canvas_controls_dropdown").click();
+
     await page.getByRole("button", { name: "Playground", exact: true }).click();
     await page.waitForSelector('[data-testid="input-chat-playground"]', {
       timeout: 100000,

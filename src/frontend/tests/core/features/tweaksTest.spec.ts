@@ -12,7 +12,7 @@ test(
     await page.getByRole("heading", { name: "Basic Prompting" }).click();
     await page.getByTestId("publish-button").click();
     await page.getByTestId("api-access-item").click();
-    await page.getByRole("tab", { name: "cURL" }).click();
+    await page.getByTestId("api_tab_curl").click();
     await page.getByTestId("icon-Copy").click();
     const handle = await page.evaluateHandle(() =>
       navigator.clipboard.readText(),
@@ -22,7 +22,7 @@ test(
     expect(clipboardContent.length).toBeGreaterThan(0);
     await page.getByTestId("tweaks-button").click();
     await page
-      .getByRole("heading", { name: "OpenAi" })
+      .getByRole("heading", { name: "Language Model" })
       .locator("div")
       .first()
       .click();
@@ -35,7 +35,7 @@ test(
 
     await page.getByText("Close").last().click();
 
-    await page.getByRole("tab", { name: "cURL" }).click();
+    await page.getByTestId("api_tab_curl").click();
     await page.getByTestId("icon-Copy").click();
     const handle2 = await page.evaluateHandle(() =>
       navigator.clipboard.readText(),
@@ -76,6 +76,7 @@ test("check if tweaks are updating when someothing on the flow changes", async (
     .dragTo(page.locator('//*[@id="react-flow-id"]'));
   await page.mouse.up();
   await page.mouse.down();
+  await page.getByTestId("canvas_controls_dropdown").click();
 
   await page.waitForSelector('[data-testid="fit_view"]', {
     timeout: 100000,
@@ -85,6 +86,7 @@ test("check if tweaks are updating when someothing on the flow changes", async (
   await page.getByTestId("zoom_out").click();
   await page.getByTestId("zoom_out").click();
   await page.getByTestId("zoom_out").click();
+  await page.getByTestId("canvas_controls_dropdown").click();
   await page.getByTestId("popover-anchor-input-collection_name").click();
   await page
     .getByTestId("popover-anchor-input-collection_name")

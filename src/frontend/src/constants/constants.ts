@@ -1,7 +1,7 @@
 // src/constants/constants.ts
 
 import custom from "../customization/config-constants";
-import { languageMap } from "../types/components";
+import type { languageMap } from "../types/components";
 
 /**
  * invalid characters for flow name
@@ -37,7 +37,13 @@ export const INVALID_CHARACTERS = [
  * It matches the variables in the text that are between {{}} or {}.
  */
 
-export const regexHighlight = /\{\{(.*?)\}\}|\{([^{}]+)\}/g;
+/**
+ *  p1 – fenced code block ```...```
+ *  p2 – opening brace run (one or more)
+ *  p3 – variable name  (no braces)
+ *  p4 – closing brace run (one or more)
+ */
+export const regexHighlight = /(```[\s\S]*?```)|(\{+)([^{}]+)(\}+)/g;
 export const specialCharsRegex = /[!@#$%^&*()\-_=+[\]{}|;:'",.<>/?\\`´]/;
 
 export const programmingLanguages: languageMap = {
@@ -183,7 +189,7 @@ export const CSVViewErrorTitle = "CSV output";
 
 export const CSVNoDataError = "No data available";
 
-export const PDFViewConstant = "Expand the ouptut to see the PDF";
+export const PDFViewConstant = "Expand the output to see the PDF";
 
 export const CSVError = "Error loading CSV";
 
@@ -552,7 +558,8 @@ export const NOUNS: string[] = [
 export const USER_PROJECTS_HEADER = "My Collection";
 
 export const DEFAULT_FOLDER = "Starter Project";
-export const DEFAULT_FOLDER_DEPRECATED = "My Projects";
+
+export const MAX_MCP_SERVER_NAME_LENGTH = 30;
 
 /**
  * Header text for admin page
@@ -660,6 +667,7 @@ export const LANGFLOW_SUPPORTED_TYPES = new Set([
   "connect",
   "auth",
   "query",
+  "mcp",
   "tools",
 ]);
 
@@ -700,7 +708,7 @@ export const TOOLTIP_HIDDEN_OUTPUTS = "Collapse hidden outputs";
 
 export const ZERO_NOTIFICATIONS = "No new notifications";
 
-export const SUCCESS_BUILD = "Built sucessfully ✨";
+export const SUCCESS_BUILD = "Built successfully ✨";
 
 export const ALERT_SAVE_WITH_API =
   "Caution: Unchecking this box only removes API keys from fields specifically designated for API keys.";
@@ -726,6 +734,8 @@ export const INSERT_API_KEY = "Insert your Langflow API key.";
 export const INVALID_API_KEY = "Your API key is not valid. ";
 export const CREATE_API_KEY = `Don't have an API key? Sign up at`;
 export const STATUS_BUILD = "Build to validate status.";
+export const STATUS_MISSING_FIELDS_ERROR =
+  "Please fill all the required fields.";
 export const STATUS_INACTIVE = "Execution blocked";
 export const STATUS_BUILDING = "Building...";
 export const SAVED_HOVER = "Last saved: ";
@@ -751,8 +761,23 @@ export const BUNDLES_SIDEBAR_FOLDER_NAMES = [
   "assemblyai",
   "LangWatch",
   "langwatch",
-  "Youtube",
+  "YouTube",
   "youtube",
+  "pinecone",
+  "weaviate",
+  "qdrant",
+  "mongodb",
+  "elastic",
+  "supabase",
+  "milvus",
+  "chroma",
+  "clickhouse",
+  "couchbase",
+  "upstash",
+  "vectara",
+  "cassandra",
+  "FAISS",
+  "pgvector",
 ];
 
 export const AUTHORIZED_DUPLICATE_REQUESTS = [
@@ -978,7 +1003,7 @@ export const DRAG_EVENTS_CUSTOM_TYPESS = {
 export const NOTE_NODE_MIN_WIDTH = 324;
 export const NOTE_NODE_MIN_HEIGHT = 324;
 export const NOTE_NODE_MAX_HEIGHT = 800;
-export const NOTE_NODE_MAX_WIDTH = 600;
+export const NOTE_NODE_MAX_WIDTH = 1000;
 
 export const COLOR_OPTIONS = {
   amber: "hsl(var(--note-amber))",
@@ -1079,5 +1104,7 @@ export const TWITTER_URL = "https://x.com/langflow_ai";
 export const DOCS_URL = "https://docs.langflow.org";
 export const DATASTAX_DOCS_URL =
   "https://docs.datastax.com/en/langflow/index.html";
+export const DESKTOP_URL = "https://www.langflow.org/desktop";
+export const BUG_REPORT_URL = "https://github.com/langflow-ai/langflow/issues";
 
 export const UUID_PARSING_ERROR = "uuid_parsing";

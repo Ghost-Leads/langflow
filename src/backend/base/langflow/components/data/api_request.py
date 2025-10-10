@@ -12,7 +12,7 @@ import httpx
 import validators
 
 from langflow.base.curl.parse import parse_context
-from langflow.custom import Component
+from langflow.custom.custom_component.component import Component
 from langflow.inputs.inputs import TabInput
 from langflow.io import (
     BoolInput,
@@ -24,7 +24,7 @@ from langflow.io import (
     Output,
     TableInput,
 )
-from langflow.schema import Data
+from langflow.schema.data import Data
 from langflow.schema.dotdict import dotdict
 from langflow.services.deps import get_settings_service
 from langflow.utils.component_utils import set_current_fields, set_field_advanced, set_field_display
@@ -45,6 +45,7 @@ DEFAULT_FIELDS = ["mode"]
 class APIRequestComponent(Component):
     display_name = "API Request"
     description = "Make HTTP requests using URL or cURL commands."
+    documentation: str = "https://docs.langflow.org/components-data#api-request"
     icon = "Globe"
     name = "APIRequest"
 
@@ -188,6 +189,8 @@ class APIRequestComponent(Component):
         """Process the body input into a valid dictionary."""
         if body is None:
             return {}
+        if hasattr(body, "data"):
+            body = body.data
         if isinstance(body, dict):
             return self._process_dict_body(body)
         if isinstance(body, str):
@@ -212,10 +215,18 @@ class APIRequestComponent(Component):
         processed_dict = {}
         try:
             for item in body:
-                if not self._is_valid_key_value_item(item):
+                # Unwrap Data objects
+                current_item = item
+                if hasattr(item, "data"):
+                    unwrapped_data = item.data
+                    # If the unwrapped data is a dict but not key-value format, use it directly
+                    if isinstance(unwrapped_data, dict) and not self._is_valid_key_value_item(unwrapped_data):
+                        return unwrapped_data
+                    current_item = unwrapped_data
+                if not self._is_valid_key_value_item(current_item):
                     continue
-                key = item["key"]
-                value = self._parse_json_value(item["value"])
+                key = current_item["key"]
+                value = self._parse_json_value(current_item["value"])
                 processed_dict[key] = value
         except (KeyError, TypeError, ValueError) as e:
             self.log(f"Failed to process body list: {e}")

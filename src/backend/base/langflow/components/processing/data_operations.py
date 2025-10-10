@@ -33,6 +33,7 @@ OPERATORS = {
 class DataOperationsComponent(Component):
     display_name = "Data Operations"
     description = "Perform various operations on a Data object."
+    documentation: str = "https://docs.langflow.org/components-processing#data-operations"
     icon = "file-json"
     name = "DataOperations"
     default_keys = ["operations", "data"]
@@ -180,7 +181,7 @@ class DataOperationsComponent(Component):
         raise ValueError(msg)
 
     # Data transformation operations
-    def select_keys(self, evaluate: bool | None = None) -> Data:
+    def select_keys(self, *, evaluate: bool | None = None) -> Data:
         """Select specific keys from the data dictionary."""
         self.validate_single_data("Select Keys")
         data_dict = self.get_normalized_data()
@@ -265,7 +266,7 @@ class DataOperationsComponent(Component):
         logger.info("evaluating data")
         return Data(**self.recursive_eval(self.get_data_dict()))
 
-    def combine_data(self, evaluate: bool | None = None) -> Data:
+    def combine_data(self, *, evaluate: bool | None = None) -> Data:
         """Combine multiple data objects into one."""
         logger.info("combining data")
         if not self.data_is_list():

@@ -16,6 +16,7 @@ import { BASENAME } from "./customization/config-constants";
 import {
   ENABLE_CUSTOM_PARAM,
   ENABLE_FILE_MANAGEMENT,
+  ENABLE_KNOWLEDGE_BASES,
 } from "./customization/feature-flags";
 import { CustomRoutesStore } from "./customization/utils/custom-routes-store";
 import { CustomRoutesStorePages } from "./customization/utils/custom-routes-store-pages";
@@ -26,11 +27,13 @@ import FlowPage from "./pages/FlowPage";
 import LoginPage from "./pages/LoginPage";
 import FilesPage from "./pages/MainPage/pages/filesPage";
 import HomePage from "./pages/MainPage/pages/homePage";
+import KnowledgePage from "./pages/MainPage/pages/knowledgePage";
 import CollectionPage from "./pages/MainPage/pages/main-page";
 import SettingsPage from "./pages/SettingsPage";
 import ApiKeysPage from "./pages/SettingsPage/pages/ApiKeysPage";
 import GeneralPage from "./pages/SettingsPage/pages/GeneralPage";
 import GlobalVariablesPage from "./pages/SettingsPage/pages/GlobalVariablesPage";
+import MCPServersPage from "./pages/SettingsPage/pages/MCPServersPage";
 import MessagesPage from "./pages/SettingsPage/pages/messagesPage";
 import ShortcutsPage from "./pages/SettingsPage/pages/ShortcutsPage";
 import ViewPage from "./pages/ViewPage";
@@ -81,7 +84,19 @@ const router = createBrowserRouter(
                     element={<CustomNavigate replace to={"flows"} />}
                   />
                   {ENABLE_FILE_MANAGEMENT && (
-                    <Route path="files" element={<FilesPage />} />
+                    <Route path="assets">
+                      <Route
+                        index
+                        element={<CustomNavigate replace to="files" />}
+                      />
+                      <Route path="files" element={<FilesPage />} />
+                      {ENABLE_KNOWLEDGE_BASES && (
+                        <Route
+                          path="knowledge-bases"
+                          element={<KnowledgePage />}
+                        />
+                      )}
+                    </Route>
                   )}
                   <Route
                     path="flows/"
@@ -124,6 +139,7 @@ const router = createBrowserRouter(
                     path="global-variables"
                     element={<GlobalVariablesPage />}
                   />
+                  <Route path="mcp-servers" element={<MCPServersPage />} />
                   <Route path="api-keys" element={<ApiKeysPage />} />
                   <Route
                     path="general/:scrollId?"

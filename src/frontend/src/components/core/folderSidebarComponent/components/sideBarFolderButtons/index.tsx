@@ -1,3 +1,6 @@
+import { useIsFetching, useIsMutating } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useParams } from "react-router-dom";
 import ForwardedIconComponent from "@/components/common/genericIconComponent";
 import {
   Sidebar,
@@ -10,10 +13,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import {
-  DEFAULT_FOLDER,
-  DEFAULT_FOLDER_DEPRECATED,
-} from "@/constants/constants";
+import { DEFAULT_FOLDER } from "@/constants/constants";
 import { useUpdateUser } from "@/controllers/API/queries/auth";
 import {
   usePatchFolders,
@@ -26,6 +26,7 @@ import {
   ENABLE_CUSTOM_PARAM,
   ENABLE_DATASTAX_LANGFLOW,
   ENABLE_FILE_MANAGEMENT,
+  ENABLE_KNOWLEDGE_BASES,
   ENABLE_MCP_NOTICE,
 } from "@/customization/feature-flags";
 import { useCustomNavigate } from "@/customization/hooks/use-custom-navigate";
@@ -36,10 +37,7 @@ import { getObjectsFromFilelist } from "@/helpers/get-objects-from-filelist";
 import useUploadFlow from "@/hooks/flows/use-upload-flow";
 import { useIsMobile } from "@/hooks/use-mobile";
 import useAuthStore from "@/stores/authStore";
-import { useIsFetching, useIsMutating } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
-import { FolderType } from "../../../../../pages/MainPage/entities";
+import type { FolderType } from "../../../../../pages/MainPage/entities";
 import useAlertStore from "../../../../../stores/alertStore";
 import useFlowsManagerStore from "../../../../../stores/flowsManagerStore";
 import { useFolderStore } from "../../../../../stores/foldersStore";
@@ -68,12 +66,12 @@ const SideBarFoldersButtonsComponent = ({
   const loading = !folders;
   const refInput = useRef<HTMLInputElement>(null);
 
-  const navigate = useCustomNavigate();
+  const _navigate = useCustomNavigate();
 
   const currentFolder = pathname.split("/");
   const urlWithoutPath =
     pathname.split("/").length < (ENABLE_CUSTOM_PARAM ? 5 : 4);
-  const checkPathFiles = pathname.includes("files");
+  const checkPathFiles = pathname.includes("assets");
 
   const checkPathName = (itemId: string) => {
     if (urlWithoutPath && itemId === myCollectionId && !checkPathFiles) {
@@ -156,7 +154,7 @@ const SideBarFoldersButtonsComponent = ({
                   });
                 },
                 onError: (err) => {
-                  console.log(err);
+                  console.error(err);
                   setErrorData({
                     title: `Error on uploading your project, try dragging it into an existing project.`,
                     list: [err["response"]["data"]["message"]],
@@ -277,7 +275,7 @@ const SideBarFoldersButtonsComponent = ({
   };
 
   const handleDoubleClick = (event, item) => {
-    if (item.name === DEFAULT_FOLDER_DEPRECATED) {
+    if (item.name === DEFAULT_FOLDER) {
       return;
     }
 
@@ -357,6 +355,14 @@ const SideBarFoldersButtonsComponent = ({
     });
   };
 
+  const handleFilesNavigation = () => {
+    _navigate("/assets/files");
+  };
+
+  const handleKnowledgeNavigation = () => {
+    _navigate("/assets/knowledge-bases");
+  };
+
   return (
     <Sidebar
       collapsible={isMobile ? "offcanvas" : "none"}
@@ -424,9 +430,7 @@ const SideBarFoldersButtonsComponent = ({
                                 />
                               ) : (
                                 <span className="block w-0 grow truncate text-sm opacity-100">
-                                  {item.name === DEFAULT_FOLDER_DEPRECATED
-                                    ? DEFAULT_FOLDER
-                                    : item.name}
+                                  {item.name}
                                 </span>
                               )}
                             </div>
@@ -473,10 +477,20 @@ const SideBarFoldersButtonsComponent = ({
       {ENABLE_FILE_MANAGEMENT && (
         <SidebarFooter className="border-t">
           <div className="grid w-full items-center gap-2 p-2">
-            {!ENABLE_DATASTAX_LANGFLOW && <CustomStoreButton />}
+            {/* TODO: Remove this on cleanup */}
+            {ENABLE_DATASTAX_LANGFLOW && <CustomStoreButton />}{" "}
+            {ENABLE_KNOWLEDGE_BASES && (
+              <SidebarMenuButton
+                onClick={handleKnowledgeNavigation}
+                size="md"
+                className="text-sm"
+              >
+                <ForwardedIconComponent name="Library" className="h-4 w-4" />
+                Knowledge
+              </SidebarMenuButton>
+            )}
             <SidebarMenuButton
-              isActive={checkPathFiles}
-              onClick={() => handleFilesClick?.()}
+              onClick={handleFilesNavigation}
               size="md"
               className="text-sm"
             >

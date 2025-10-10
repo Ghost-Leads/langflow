@@ -1,8 +1,9 @@
 from typing import Any
 
-from langflow.custom import Component
+from langflow.custom.custom_component.component import Component
 from langflow.io import DataInput, DropdownInput, MessageTextInput, Output
-from langflow.schema import Data, dotdict
+from langflow.schema.data import Data
+from langflow.schema.dotdict import dotdict
 
 
 class DataConditionalRouterComponent(Component):
@@ -11,6 +12,7 @@ class DataConditionalRouterComponent(Component):
     icon = "split"
     name = "DataConditionalRouter"
     legacy = True
+    replacement = ["logic.ConditionalRouter"]
 
     inputs = [
         DataInput(

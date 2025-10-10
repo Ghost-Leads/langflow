@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test";
 import * as dotenv from "dotenv";
 import path from "path";
-import { adjustScreenView } from "../../utils/adjust-screen-view";
 import { awaitBootstrapTest } from "../../utils/await-bootstrap-test";
 import { initialGPTsetup } from "../../utils/initialGPTsetup";
 
@@ -35,12 +34,8 @@ test(
     await page
       .getByTestId("input_outputChat Output")
       .dragTo(page.locator('//*[@id="react-flow-id"]'), {
-        targetPosition: { x: 0, y: 0 },
+        targetPosition: { x: 400, y: 100 },
       });
-
-    await page
-      .getByTestId("input_outputChat Output")
-      .dragTo(page.locator('//*[@id="react-flow-id"]'));
 
     await page.getByTestId("sidebar-search-input").click();
     await page.getByTestId("sidebar-search-input").fill("chat input");
@@ -55,12 +50,13 @@ test(
     await page.getByTestId("sidebar-search-input").fill("openai");
 
     await page
-      .getByTestId("languagemodelsOpenAI")
+      .getByTestId("openaiOpenAI")
       .dragTo(page.locator('//*[@id="react-flow-id"]'), {
         targetPosition: { x: 100, y: 200 },
       });
 
     await initialGPTsetup(page);
+    await page.getByTestId("canvas_controls_dropdown").click();
 
     await page.waitForSelector('[data-testid="fit_view"]', {
       timeout: 5000,
@@ -68,6 +64,7 @@ test(
     });
 
     await page.getByTestId("fit_view").click();
+    await page.getByTestId("canvas_controls_dropdown").click();
 
     await page
       .getByTestId("handle-chatinput-noshownode-chat message-source")
@@ -81,8 +78,11 @@ test(
       .getByTestId("handle-chatoutput-noshownode-inputs-target")
       .last()
       .click();
+    await page.getByTestId("canvas_controls_dropdown").click();
 
     await page.getByTestId("fit_view").click();
+    await page.getByTestId("canvas_controls_dropdown").click();
+
     await page.getByRole("button", { name: "Playground", exact: true }).click();
     await page.waitForSelector('[data-testid="input-chat-playground"]', {
       timeout: 100000,
@@ -100,7 +100,7 @@ test(
 
     await page.getByTestId("button-send").click();
 
-    await page.getByRole("tab", { name: "python" }).isVisible({
+    await page.getByTestId("api_tab_python").isVisible({
       timeout: 100000,
     });
 
@@ -147,9 +147,13 @@ test(
       .dragTo(page.locator('//*[@id="react-flow-id"]'));
     await page.mouse.up();
     await page.mouse.down();
+
+    await page.getByTestId("canvas_controls_dropdown").click();
+
     await page.waitForSelector('[data-testid="fit_view"]', {
       timeout: 100000,
     });
+    await page.getByTestId("canvas_controls_dropdown").click();
 
     await page.getByTestId("playground-btn-flow-io").click({ force: true });
 
